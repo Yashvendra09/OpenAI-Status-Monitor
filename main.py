@@ -1,36 +1,34 @@
 import asyncio
 import logging
+from fastapi import FastAPI
 
 from core.fetcher import HTTPFetcher
 from core.openai_provider import OpenAIStatusProvider
 from config import POLL_INTERVAL
 
-# Configure logging
+# Logging config
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s | %(levelname)s | %(message)s",
     datefmt="%Y-%m-%d %H:%M:%S",
 )
-logging.getLogger("httpx").setLevel(logging.WARNING)
 
+logging.getLogger("httpx").setLevel(logging.WARNING)
 logger = logging.getLogger(__name__)
+
+app = FastAPI()
+
+latest_events = []
+seen_events = set()
 
 
 async def monitor():
-    logger.info("Monitor started")
+    logger.info("Background monitor started")
 
     fetcher = HTTPFetcher()
-
-    # 🔁 Switch provider here for testing if needed
-    providers = [
-        OpenAIStatusProvider(),
-    ]
-
-    seen_events = set()
+    providers = [OpenAIStatusProvider()]
 
     while True:
-
-        # Fetch all providers concurrently
         tasks = [provider.fetch(fetcher) for provider in providers]
         results = await asyncio.gather(*tasks, return_exceptions=True)
 
@@ -52,16 +50,33 @@ async def monitor():
 
                 if unique_key not in seen_events:
                     seen_events.add(unique_key)
+                    latest_events.append({
+                        "provider": event.provider,
+                        "product": event.title,
+                        "status": event.status,
+                        "message": event.message,
+                        "updated_at": event.updated_at,
+                    })
 
                     logger.info(
                         f"New Event | Provider={event.provider} | "
                         f"Product={event.title} | "
-                        f"Status={event.status} | "
-                        f"Message={event.message}"
+                        f"Status={event.status}"
                     )
 
         await asyncio.sleep(POLL_INTERVAL)
 
 
-if __name__ == "__main__":
-    asyncio.run(monitor())
+@app.on_event("startup")
+async def startup_event():
+    asyncio.create_task(monitor())
+
+
+@app.get("/health")
+async def health():
+    return {"status": "running"}
+
+
+@app.get("/latest")
+async def latest():
+    return {"events": latest_events[-10:]}

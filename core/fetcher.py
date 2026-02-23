@@ -3,10 +3,6 @@ from typing import Optional
 
 
 class HTTPFetcher:
-    """
-    Handles HTTP requests with ETag-based conditional fetching.
-    Prevents unnecessary data transfer.
-    """
 
     def __init__(self):
         self._etag_cache = {}

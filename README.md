@@ -39,6 +39,7 @@ bolna-status-tracker/
 │   ├── openai_provider.py
 │
 └── requirements.txt
+
 🔹 1. Provider Abstraction
 
 All monitoring targets implement a common StatusProvider interface:
